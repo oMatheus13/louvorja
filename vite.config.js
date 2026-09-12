@@ -103,10 +103,13 @@ export default ({ mode }) => {
             },
             {
               urlPattern: ({ url }) =>
-                url.origin.includes("api.louvorja") && url.pathname.startsWith("/file"),
+                url.origin.includes("api.louvorja") &&
+                (url.pathname.startsWith("/file/images") ||
+                  url.pathname.startsWith("/file/covers") ||
+                  /\.(?:png|jpg|jpeg|svg|webp|ico)$/i.test(url.pathname)),
               handler: "CacheFirst",
               options: {
-                cacheName: "louvorja-media-cache",
+                cacheName: "louvorja-images-cache",
                 expiration: {
                   maxEntries: 300,
                   maxAgeSeconds: 60 * 60 * 24 * 60,
@@ -114,7 +117,6 @@ export default ({ mode }) => {
                 cacheableResponse: {
                   statuses: [0, 200],
                 },
-                rangeRequests: true,
               },
             },
           ],

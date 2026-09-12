@@ -1,10 +1,18 @@
 export default {
   db(path) {
+    if (!path) return "";
     const url = import.meta.env.VITE_URL_DATABASE;
-    return url + path;
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
+    return url + cleanPath;
   },
   file(path) {
+    if (!path) return "";
     const url = import.meta.env.VITE_URL_FILES;
-    return url + path;
+    const cleanPath = path.startsWith("/") ? path : `/${path}`;
+    try {
+      return url + encodeURI(decodeURI(cleanPath));
+    } catch {
+      return url + encodeURI(cleanPath);
+    }
   },
 };

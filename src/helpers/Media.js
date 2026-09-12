@@ -105,12 +105,25 @@ export default {
         ),
       );
 
-      $appdata.set(
-        "modules.media.config.audio",
-        $path.file(
-          mode == "audio" ? data.url_music : data.url_instrumental_music,
-        ),
-      );
+      const rawAudioPath =
+        mode == "audio" ? data.url_music : data.url_instrumental_music;
+
+      if (!rawAudioPath) {
+        $alert.error({
+          text: "modules.media.alerts.not_loaded",
+          error:
+            mode == "instrumental"
+              ? "Esta música não possui versão instrumental/playback."
+              : "Esta música não possui arquivo de áudio disponível.",
+          translate: false,
+        });
+        $appdata.set("modules.media.config.audio", "");
+        $appdata.set("modules.media.loading", false);
+        return;
+      }
+
+      const audioUrl = $path.file(rawAudioPath);
+      $appdata.set("modules.media.config.audio", audioUrl);
 
       if (
         $appdata.get("is_online") &&
@@ -118,66 +131,14 @@ export default {
       ) {
         //Se a opção lazy_load estiver marcada, execução rápida (o audio vai carregando enquanto é executado)
         $appdata.set("modules.media.config.lazy", true);
-        audio.src = $appdata.get("modules.media.config.audio");
+        audio.src = audioUrl;
         audio.load();
         $appdata.set("modules.media.loading", false);
         this.play();
       } else {
         //Se a opção lazy_load estiver desmarcada, execução lenta (o audio só é executado depois de totalmente carregado)
         $appdata.set("modules.media.config.lazy", false);
-        let self = this;
-        let request = new XMLHttpRequest();
-        try {
-          request.open("GET", $appdata.get("modules.media.config.audio"), true);
-        } catch (error) {
-          $alert.error(
-            { text: "modules.media.alerts.not_loaded", error },
-            function (a) {
-              if (a) {
-                self.open(id_music);
-              }
-            },
-          );
-          return;
-        }
-
-        request.responseType = "blob";
-        request.onload = function () {
-          if (this.status == 200) {
-            audio.src = URL.createObjectURL(this.response);
-            audio.load();
-            self.play();
-          } else {
-            $alert.error(
-              {
-                text: "modules.media.alerts.not_loaded",
-                error: request.statusText || "",
-              },
-              function (a) {
-                if (a) {
-                  self.open(id_music);
-                }
-              },
-            );
-          }
-        };
-        request.onerror = function () {
-          $alert.error(
-            {
-              text: "modules.media.alerts.not_loaded",
-              error: request.statusText || "",
-            },
-            function (a) {
-              if (a) {
-                self.open(id_music);
-              }
-            },
-          );
-          return;
-        };
-
-        request.send();
-        $appdata.set("modules.media.loading", false);
+        this.loadAudioAsBlob(audioUrl, id_music);
       }
     } else {
       $appdata.set("modules.media.config.audio", "");
@@ -185,6 +146,60 @@ export default {
     }
 
     $appdata.set("modules.media.config.mode", mode);
+  },
+
+  loadAudioAsBlob(url, id_music) {
+    const audio = this.getElement();
+    const self = this;
+    $appdata.set("modules.media.loading", true);
+
+    const request = new XMLHttpRequest();
+    try {
+      request.open("GET", url, true);
+    } catch (error) {
+      $appdata.set("modules.media.loading", false);
+      $alert.error(
+        { text: "modules.media.alerts.not_loaded", error },
+        function (a) {
+          if (a && id_music) self.open(id_music);
+        },
+      );
+      return;
+    }
+
+    request.responseType = "blob";
+    request.onload = function () {
+      $appdata.set("modules.media.loading", false);
+      if (this.status == 200) {
+        audio.src = URL.createObjectURL(this.response);
+        audio.load();
+        self.play();
+      } else {
+        $alert.error(
+          {
+            text: "modules.media.alerts.not_loaded",
+            error: request.statusText || "",
+          },
+          function (a) {
+            if (a && id_music) self.open(id_music);
+          },
+        );
+      }
+    };
+    request.onerror = function () {
+      $appdata.set("modules.media.loading", false);
+      $alert.error(
+        {
+          text: "modules.media.alerts.not_loaded",
+          error: request.statusText || "",
+        },
+        function (a) {
+          if (a && id_music) self.open(id_music);
+        },
+      );
+    };
+
+    request.send();
   },
 
   close(force = false) {
@@ -460,6 +475,25 @@ export default {
     } else {
       let self = this;
       audio.play().catch((e) => {
+        const currentAudioUrl = $appdata.get("modules.media.config.audio");
+        const isLazy = $appdata.get("modules.media.config.lazy");
+        if (
+          isLazy &&
+          currentAudioUrl &&
+          !currentAudioUrl.startsWith("blob:")
+        ) {
+          $dev.write(
+            "Streaming direto falhou, tentando fallback via blob...",
+            e,
+          );
+          $appdata.set("modules.media.config.lazy", false);
+          self.loadAudioAsBlob(
+            currentAudioUrl,
+            $appdata.get("modules.media.id_music"),
+          );
+          return;
+        }
+
         $alert.error(
           {
             text: "modules.media.alerts.not_loaded",
@@ -653,11 +687,15 @@ export default {
       el = document.createElement("audio");
       el.setAttribute("id", id);
       el.setAttribute("preload", "auto");
+      el.setAttribute("crossorigin", "anonymous");
       document.body.appendChild(el);
       el.addEventListener("timeupdate", this.timeUpdate.bind(this));
       el.addEventListener("progress", this.timeUpdate.bind(this));
     } else {
       el = document.getElementById(id);
+      if (!el.getAttribute("crossorigin")) {
+        el.setAttribute("crossorigin", "anonymous");
+      }
     }
 
     el.setAttribute("autoplay", true);

@@ -3,7 +3,7 @@
     <template v-slot:prepend>
       <v-app-bar-nav-icon @click="$appdata.toogle('menu.show')" />
     </template>
-    <v-app-bar-title class="brand-font lj-app-title">{{ $t("app.name") }}</v-app-bar-title>
+    <v-app-bar-title class="brand-font lj-app-title">LouvorJA | oMatheus</v-app-bar-title>
     <v-spacer />
 
     <v-bottom-sheet v-if="remote">
