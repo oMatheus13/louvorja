@@ -84,10 +84,43 @@ export default ({ mode }) => {
           enabled: true, // Ativa o PWA também durante o desenvolvimento
         },
         workbox: {
-          globPatterns: ["**/*.{html,js,css,svg,png}"], // Arquivos que o Service Worker deve cachear
+          globPatterns: ["**/*.{html,js,css,svg,png}"],
+          runtimeCaching: [
+            {
+              urlPattern: ({ url }) =>
+                url.origin.includes("api.louvorja") && url.pathname.startsWith("/json_db"),
+              handler: "StaleWhileRevalidate",
+              options: {
+                cacheName: "louvorja-db-cache",
+                expiration: {
+                  maxEntries: 500,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+              },
+            },
+            {
+              urlPattern: ({ url }) =>
+                url.origin.includes("api.louvorja") && url.pathname.startsWith("/file"),
+              handler: "CacheFirst",
+              options: {
+                cacheName: "louvorja-media-cache",
+                expiration: {
+                  maxEntries: 300,
+                  maxAgeSeconds: 60 * 60 * 24 * 60,
+                },
+                cacheableResponse: {
+                  statuses: [0, 200],
+                },
+                rangeRequests: true,
+              },
+            },
+          ],
         },
         manifest: {
-          name: "LouvorJA",
+          name: "LouvorJA | oMatheus",
           short_name: "LouvorJA",
           description: "Software de músicas para Louvor e Adoração",
           start_url: process.env.VITE_BASE_URL ?? "/",
